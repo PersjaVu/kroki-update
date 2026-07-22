@@ -119,12 +119,16 @@ async function main(){
   const base=event.pull_request?.base?.sha||process.env.CTU_BASE_SHA
   const head=event.pull_request?.head?.sha||process.env.CTU_HEAD_SHA||'HEAD'
   if(!base)throw new Error('A pull request base SHA is required.')
-  try{git(['fetch','--no-tags','--depth=1','origin',base])}catch{}
-  const changed=git(['diff','--name-status',`${base}...${head}`]).trim().split('\n').filter(Boolean)
+  try{if(git(['rev-parse','--is-shallow-repository']).trim()==='true')git(['fetch','--no-tags','--unshallow','origin'])}catch{}
+  try{git(['fetch','--no-tags','origin',base,head])}catch(error){console.warn(`Full SHA fetch was not available; using checked-out objects: ${error.message}`)}
+  let compareRef=base
+  try{compareRef=git(['merge-base',base,head]).trim();if(!compareRef)throw new Error('empty merge base')}
+  catch{console.warn(`No merge base exists for ${base.slice(0,7)} and ${head.slice(0,7)}; comparing the two commit trees directly.`)}
+  const changed=git(['diff','--name-status',compareRef,head]).trim().split('\n').filter(Boolean)
   const files=[]
   const append=(displayPath,engine,status,beforeSource,afterSource)=>{const before=parseDiagram(engine,beforeSource),after=parseDiagram(engine,afterSource);const semantic=before.semantic&&after.semantic&&(before.nodes.size>0||after.nodes.size>0);files.push({path:displayPath,engine,status,semantic,diff:compareModels(before,after),showUnchanged:false})}
   for(const row of changed){const [status,...names]=row.split('\t');const file=names.at(-1),oldFile=/^[RC]/.test(status)?names[0]:file,extension=path.extname(file).slice(1).toLowerCase();if(!extensionEngines[extension]&&!['md','markdown'].includes(extension))continue
-    const beforeSource=status==='A'?'':at(base,oldFile),afterSource=status==='D'?'':at(head,file)
+    const beforeSource=status==='A'?'':at(compareRef,oldFile),afterSource=status==='D'?'':at(head,file)
     const fileStatus=status==='A'?'added':status==='D'?'removed':'modified'
     if(['md','markdown'].includes(extension)){
       const beforeBlocks=new Map(extractMarkdown(beforeSource).map(block=>[block.key,block])),afterBlocks=new Map(extractMarkdown(afterSource).map(block=>[block.key,block]))

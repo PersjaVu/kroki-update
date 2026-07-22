@@ -514,6 +514,8 @@ Runner Windows dùng `shell: powershell` cho health check và composite action, 
 
 PR diff phân tích node/edge cho Mermaid, PlantUML/C4, Graphviz/DOT, D2 và DBML. Markdown được tách theo từng fenced block và tên lấy từ heading hoặc `title`. Renderer chưa có structural parser được biểu diễn ở mức file và ghi rõ là fallback, không suy đoán cấu trúc.
 
+Script fetch đầy đủ base/head SHA và bỏ trạng thái shallow trước khi tìm merge-base. Diff chuẩn dùng `merge-base → head`; nếu hai history thực sự không có tổ tiên chung, script fallback sang so sánh trực tiếp base tree với head tree thay vì làm workflow thất bại.
+
 Màu change map:
 
 | Trạng thái | Màu nền | Màu viền |
