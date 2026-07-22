@@ -49,8 +49,11 @@ jobs:
           node-version: 24
 
       - name: Verify local Code To UML
-        shell: bash
-        run: curl --fail-with-body --silent --show-error http://localhost:8000/health > /dev/null
+        shell: powershell
+        run: |
+          $response = Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing -TimeoutSec 15
+          if ($response.StatusCode -ne 200) { throw "Code To UML health check failed: HTTP $($response.StatusCode)" }
+          Write-Host 'Code To UML local health check passed.'
 
       - name: Build semantic diagram change map
         id: diagram-diff

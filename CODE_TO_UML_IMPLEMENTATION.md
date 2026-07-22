@@ -510,6 +510,8 @@ Action có hai chế độ:
 
 Workflow PR chạy bằng `runs-on: self-hosted` trên chính máy chạy Docker và gọi `http://localhost:8000`. Local Gateway cho phép guest render nên workflow không cần API key hoặc public deployment. Job có health preflight và chỉ nhận PR có head repository trùng repository hiện tại, tránh chạy code từ fork không tin cậy trên máy cá nhân.
 
+Runner Windows dùng `shell: powershell` cho health check và composite action, còn phần xử lý HTTP/diff chạy bằng Node.js. Không dùng Git Bash vì đường dẫn temp dạng `C:\actions-runner\_work\_temp` có thể bị Bash diễn giải sai. Máy self-hosted hiện tại không yêu cầu cài thêm PowerShell 7 (`pwsh`).
+
 PR diff phân tích node/edge cho Mermaid, PlantUML/C4, Graphviz/DOT, D2 và DBML. Markdown được tách theo từng fenced block và tên lấy từ heading hoặc `title`. Renderer chưa có structural parser được biểu diễn ở mức file và ghi rõ là fallback, không suy đoán cấu trúc.
 
 Màu change map:

@@ -55,7 +55,7 @@ runs:
   steps:
     - name: Render diagram
       if: inputs.mode == 'render'
-      shell: bash
+      shell: powershell
       env:
         CTU_SERVER: ${{ inputs.server-url }}
         CTU_API_KEY: ${{ inputs.api-key }}
@@ -63,19 +63,11 @@ runs:
         CTU_FORMAT: ${{ inputs.format }}
         CTU_SOURCE: ${{ inputs.source }}
         CTU_OUTPUT: ${{ inputs.output }}
-      run: |
-        set -euo pipefail
-        auth=()
-        if [[ -n "${CTU_API_KEY}" ]]; then auth=(-H "Authorization: Bearer ${CTU_API_KEY}"); fi
-        curl --fail-with-body --silent --show-error "${auth[@]}" \
-          -H "Content-Type: text/plain" \
-          --data-binary "@${CTU_SOURCE}" \
-          "${CTU_SERVER%/}/${CTU_ENGINE}/${CTU_FORMAT}" \
-          --output "${CTU_OUTPUT}"
+      run: node "${{ github.action_path }}/github-action/render-file.mjs"
     - name: Build pull request diagram diff
       id: pr-diff
       if: inputs.mode == 'pr-diff'
-      shell: bash
+      shell: powershell
       env:
         CTU_SERVER: ${{ inputs.server-url }}
         CTU_API_KEY: ${{ inputs.api-key }}
