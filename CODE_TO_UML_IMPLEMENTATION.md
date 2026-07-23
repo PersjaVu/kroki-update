@@ -503,9 +503,10 @@ Khi tạo/cập nhật diagram, source và options được ghi thêm vào `diag
 
 ## 14. GitHub Action
 
-Action có hai chế độ:
+Action có ba chế độ:
 
 - `render`: render một source thành output như trước.
+- `pre-render`: phát hiện code fence diagram trong Markdown, render SVG, chèn cú pháp `![](...)` và commit ảnh vào cùng nhánh source.
 - `pr-diff`: tự lấy base/head SHA từ Pull Request, phát hiện diagram thay đổi và tạo semantic change map.
 
 Workflow PR chạy bằng `runs-on: self-hosted` trên chính máy chạy Docker và gọi `http://localhost:8000`. Local Gateway cho phép guest render nên workflow không cần API key hoặc public deployment. Job có health preflight và chỉ nhận PR có head repository trùng repository hiện tại, tránh chạy code từ fork không tin cậy trên máy cá nhân.
@@ -527,6 +528,12 @@ Màu change map:
 Artifact `diagram-pr-diff.svg` được upload bằng `actions/upload-artifact`. Bot tạo hoặc cập nhật một comment cố định có số node thêm/sửa/xóa và link đến workflow run, tránh spam comment sau mỗi lần push.
 
 Ngoài workflow artifact, Action sử dụng GitHub Git Data API để duy trì nhánh orphan `diagram-artifacts`. Mỗi PR có hai file `pull-requests/<PR_NUMBER>/diagram-diff.svg` và `diagram-diff.png`. Comment nhúng PNG bằng cú pháp `![Code To UML diagram changes](raw-url)` để hiển thị trực tiếp, đồng thời cung cấp link SVG vector. Git Data API tạo blob, tree, commit rồi cập nhật branch ref, không checkout/chuyển branch trong workspace của runner.
+
+Workflow `.github/workflows/code-to-uml-markdown.yml` là phương án pre-render thay cho GitHub App khi hệ thống chỉ chạy localhost. Script `github-action/pre-render-markdown.mjs` quét các file `.md`/`.markdown` đã được Git theo dõi, nhận diện code fence theo renderer, gọi Gateway để tạo SVG và ghi ảnh vào `.code-to-uml/rendered/`. Chính file Markdown được cập nhật bằng ảnh tương đối `![](...)`; source gốc được giữ trong `<details>` đóng mặc định để vẫn chỉnh sửa và làm input cho lần render sau.
+
+Transformation có tính idempotent: script luôn tháo khối generated cũ về source chuẩn trước khi phân tích rồi tạo lại cùng đường dẫn ổn định. Nếu source không đổi, lần chạy sau không có Git diff và bot không tạo commit. Một diagram sai chỉ bị bỏ qua riêng, source của nó vẫn hiển thị; các diagram hợp lệ khác vẫn được commit. HTTP 429 được retry theo cửa sổ rate limit, hoặc có thể tránh bằng secret `CODE_TO_UML_API_KEY`.
+
+Workflow artifact chỉ dùng để tải trọn bộ kết quả CI vì URL artifact không phải raw image URL. Để hiển thị trực tiếp: Markdown trong repository tham chiếu SVG đã commit cùng branch; comment PR tham chiếu raw URL từ nhánh `diagram-artifacts`.
 
 Action nhận các input:
 

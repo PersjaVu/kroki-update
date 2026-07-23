@@ -1,14 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const extensionEngines = {
   puml:'plantuml', plantuml:'plantuml', c4puml:'c4plantuml', mmd:'mermaid', mermaid:'mermaid', dot:'graphviz', gv:'graphviz',
-  d2:'d2', dbml:'dbml', ditaa:'ditaa', blockdiag:'blockdiag', seqdiag:'seqdiag', actdiag:'actdiag', nwdiag:'nwdiag',
+  d2:'d2', dbml:'dbml', ditaa:'ditaa', diag:'blockdiag', blockdiag:'blockdiag', seqdiag:'seqdiag', actdiag:'actdiag', nwdiag:'nwdiag',
   packetdiag:'packetdiag', rackdiag:'rackdiag', umlet:'umlet', ux:'umlet', erd:'erd', bob:'svgbob', svgbob:'svgbob',
   nomnoml:'nomnoml', vega:'vega', vlite:'vegalite', vegalite:'vegalite', wavedrom:'wavedrom', bpmn:'bpmn', bf:'bytefield',
-  excalidraw:'excalidraw', pikchr:'pikchr', structurizr:'structurizr', drawio:'diagramsnet', tikz:'tikz', dbml:'dbml', yaml:'wireviz', goat:'goat'
+  excalidraw:'excalidraw', pikchr:'pikchr', structurizr:'structurizr', drawio:'diagramsnet', tikz:'tikz', tex:'tikz', sv:'symbolator', json5:'bytefield', wireviz:'wireviz', goat:'goat'
 }
 const fenceEngines={uml:'plantuml',puml:'plantuml',plantuml:'plantuml',c4plantuml:'c4plantuml',mermaid:'mermaid',mmd:'mermaid',dot:'graphviz',graphviz:'graphviz',gv:'graphviz',d2:'d2',dbml:'dbml',ditaa:'ditaa',blockdiag:'blockdiag',seqdiag:'seqdiag',actdiag:'actdiag',nwdiag:'nwdiag',packetdiag:'packetdiag',rackdiag:'rackdiag',umlet:'umlet',erd:'erd',svgbob:'svgbob',symbolator:'symbolator',nomnoml:'nomnoml',vega:'vega',vegalite:'vegalite',wavedrom:'wavedrom',bpmn:'bpmn',bytefield:'bytefield',excalidraw:'excalidraw',pikchr:'pikchr',structurizr:'structurizr',diagramsnet:'diagramsnet',d2:'d2',tikz:'tikz',wireviz:'wireviz',goat:'goat'}
 
@@ -114,6 +115,17 @@ function git(args){return execFileSync('git',args,{encoding:'utf8',maxBuffer:20*
 function at(ref,file){try{return git(['show',`${ref}:${file}`])}catch{return ''}}
 function writeOutput(name,value){if(process.env.GITHUB_OUTPUT)fs.appendFileSync(process.env.GITHUB_OUTPUT,`${name}=${value}\n`)}
 
+function previewFilename(preview,index){
+  const readable=`${preview.path}-${preview.title}`.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80)||'diagram'
+  const digest=createHash('sha256').update(`${preview.path}\0${preview.engine}\0${preview.title}`).digest('hex').slice(0,10)
+  return `${String(index+1).padStart(2,'0')}-${readable}-${digest}.svg`
+}
+
+function rawUrl(repository,branch,file){
+  const encodedPath=file.split('/').map(encodeURIComponent).join('/')
+  return `https://raw.githubusercontent.com/${repository}/${encodeURIComponent(branch)}/${encodedPath}`
+}
+
 async function githubJson(url,options={}){
   const response=await fetch(url,{...options,headers:{Authorization:`Bearer ${process.env.GITHUB_TOKEN}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json',...(options.headers||{})}})
   if(!response.ok)throw new Error(`GitHub API ${options.method||'GET'} ${url} failed: HTTP ${response.status} ${await response.text()}`)
@@ -146,46 +158,54 @@ async function main(){
   try{compareRef=git(['merge-base',base,head]).trim();if(!compareRef)throw new Error('empty merge base')}
   catch{console.warn(`No merge base exists for ${base.slice(0,7)} and ${head.slice(0,7)}; comparing the two commit trees directly.`)}
   const changed=git(['diff','--name-status',compareRef,head]).trim().split('\n').filter(Boolean)
-  const files=[]
+  const files=[],previews=[]
   const append=(displayPath,engine,status,beforeSource,afterSource)=>{const before=parseDiagram(engine,beforeSource),after=parseDiagram(engine,afterSource);const semantic=before.semantic&&after.semantic&&(before.nodes.size>0||after.nodes.size>0);files.push({path:displayPath,engine,status,semantic,diff:compareModels(before,after),showUnchanged:false})}
   for(const row of changed){const [status,...names]=row.split('\t');const file=names.at(-1),oldFile=/^[RC]/.test(status)?names[0]:file,extension=path.extname(file).slice(1).toLowerCase();if(!extensionEngines[extension]&&!['md','markdown'].includes(extension))continue
     const beforeSource=status==='A'?'':at(compareRef,oldFile),afterSource=status==='D'?'':at(head,file)
     const fileStatus=status==='A'?'added':status==='D'?'removed':'modified'
     if(['md','markdown'].includes(extension)){
       const beforeBlocks=new Map(extractMarkdown(beforeSource).map(block=>[block.key,block])),afterBlocks=new Map(extractMarkdown(afterSource).map(block=>[block.key,block]))
+      for(const block of afterBlocks.values())previews.push({path:file,title:block.title,engine:block.engine,source:block.source})
       for(const key of new Set([...beforeBlocks.keys(),...afterBlocks.keys()])){const oldBlock=beforeBlocks.get(key),newBlock=afterBlocks.get(key);if(oldBlock?.source===newBlock?.source)continue;const block=newBlock||oldBlock;append(`${file} · ${block.title}`,block.engine,!oldBlock?'added':!newBlock?'removed':'modified',oldBlock?.source||'',newBlock?.source||'')}
-    }else append(file,extensionEngines[extension],fileStatus,beforeSource,afterSource)
+    }else{
+      const engine=extensionEngines[extension]
+      append(file,engine,fileStatus,beforeSource,afterSource)
+      if(status!=='D'&&afterSource.trim())previews.push({path:file,title:path.basename(file),engine,source:afterSource})
+    }
   }
   const output=process.env.CTU_DIFF_OUTPUT||'artifacts/diagram-pr-diff.svg'
   fs.mkdirSync(path.dirname(output),{recursive:true})
   if(!files.length){writeOutput('changed','false');writeOutput('diagram-count','0');console.log('No changed diagram files.');return}
   const dot=buildDot(files,{base:event.pull_request?.base?.ref||base.slice(0,7),head:event.pull_request?.head?.ref||head.slice(0,7)})
-  const render=async format=>{const headers={'Content-Type':'text/plain',Accept:format==='svg'?'image/svg+xml':'image/png'};if(process.env.CTU_API_KEY)headers.Authorization=`Bearer ${process.env.CTU_API_KEY}`;const response=await fetch(`${process.env.CTU_SERVER.replace(/\/$/,'')}/graphviz/${format}`,{method:'POST',headers,body:dot});if(!response.ok)throw new Error(`Render ${format} failed: HTTP ${response.status} ${await response.text()}`);return Buffer.from(await response.arrayBuffer())}
-  const [svg,png]=await Promise.all([render('svg'),render('png')])
+  const render=async(engine,format,source)=>{const headers={'Content-Type':'text/plain',Accept:format==='svg'?'image/svg+xml':'image/png'};if(process.env.CTU_API_KEY)headers.Authorization=`Bearer ${process.env.CTU_API_KEY}`;let response;for(let attempt=0;attempt<3;attempt++){response=await fetch(`${process.env.CTU_SERVER.replace(/\/$/,'')}/${engine}/${format}`,{method:'POST',headers,body:source});if(response.status!==429||attempt===2)break;const waitMs=60_500-(Date.now()%60_000);console.warn(`Rate limit reached while rendering ${engine}; retrying in ${Math.ceil(waitMs/1000)}s.`);await new Promise(resolve=>setTimeout(resolve,waitMs))}if(!response.ok)throw new Error(`Render ${engine}/${format} failed: HTTP ${response.status} ${(await response.text()).slice(0,300)}`);return Buffer.from(await response.arrayBuffer())}
+  const [svg,png]=await Promise.all([render('graphviz','svg',dot),render('graphviz','png',dot)])
   fs.writeFileSync(output,svg)
+  const previewOutput=path.resolve(process.env.CTU_PREVIEW_OUTPUT||'artifacts/pr-diagrams')
+  const workspace=path.resolve(process.env.GITHUB_WORKSPACE||process.cwd())
+  if(previewOutput===workspace||!previewOutput.startsWith(`${workspace}${path.sep}`))throw new Error(`Preview output must stay inside the workspace: ${previewOutput}`)
+  fs.rmSync(previewOutput,{recursive:true,force:true});fs.mkdirSync(previewOutput,{recursive:true})
+  const renderedPreviews=[],previewFailures=[]
+  for(const [index,preview] of previews.entries()){
+    try{const content=await render(preview.engine,'svg',preview.source),filename=previewFilename(preview,index),localPath=path.join(previewOutput,filename);fs.writeFileSync(localPath,content);renderedPreviews.push({...preview,filename,localPath,content})}
+    catch(error){previewFailures.push({...preview,error:error.message});console.warn(`Skipping preview ${preview.path} · ${preview.title}: ${error.message}`)}
+  }
   const counts={added:0,modified:0,removed:0};for(const file of files)for(const node of file.diff.nodes)if(counts[node.status]!==undefined)counts[node.status]++
-  writeOutput('changed','true');writeOutput('diagram-count',String(files.length));writeOutput('added',String(counts.added));writeOutput('modified',String(counts.modified));writeOutput('removed',String(counts.removed));writeOutput('output',output)
-  if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`## Code To UML · PR diagram diff\n\n- Diagram files: **${files.length}**\n- Added nodes: **${counts.added}**\n- Modified nodes: **${counts.modified}**\n- Removed nodes: **${counts.removed}**\n- Artifact: \`${output}\`\n`)
+  writeOutput('changed','true');writeOutput('diagram-count',String(files.length));writeOutput('preview-count',String(renderedPreviews.length));writeOutput('preview-failed',String(previewFailures.length));writeOutput('added',String(counts.added));writeOutput('modified',String(counts.modified));writeOutput('removed',String(counts.removed));writeOutput('output',output)
+  if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`## Code To UML · PR diagrams\n\n- Changed diagrams: **${files.length}**\n- Rendered previews: **${renderedPreviews.length}**\n- Skipped previews: **${previewFailures.length}**\n- Added nodes: **${counts.added}**\n- Modified nodes: **${counts.modified}**\n- Removed nodes: **${counts.removed}**\n- Artifact: \`${output}\`\n`)
   if(process.env.CTU_COMMENT==='true'&&process.env.GITHUB_TOKEN&&event.pull_request){
     const marker='<!-- code-to-uml-pr-diff -->',api=`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}`,headers={Authorization:`Bearer ${process.env.GITHUB_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},branch=process.env.CTU_ARTIFACT_BRANCH||'diagram-artifacts',artifactRoot=`pull-requests/${event.pull_request.number}`
-    await publishArtifactBranch(api,branch,[{path:`${artifactRoot}/diagram-diff.svg`,content:svg},{path:`${artifactRoot}/diagram-diff.png`,content:png}],`docs(diagram): update PR #${event.pull_request.number} change map`)
-    const imageUrl=`https://raw.githubusercontent.com/${process.env.GITHUB_REPOSITORY}/${encodeURIComponent(branch)}/${artifactRoot}/diagram-diff.png?v=${process.env.GITHUB_RUN_ID}`
+    const published=[{path:`${artifactRoot}/diagram-diff.svg`,content:svg},{path:`${artifactRoot}/diagram-diff.png`,content:png},...renderedPreviews.map(preview=>({path:`${artifactRoot}/previews/${preview.filename}`,content:preview.content}))]
+    await publishArtifactBranch(api,branch,published,`docs(diagram): update PR #${event.pull_request.number} diagrams`)
+    const imageUrl=`${rawUrl(process.env.GITHUB_REPOSITORY,branch,`${artifactRoot}/diagram-diff.png`)}?v=${process.env.GITHUB_RUN_ID}`
     writeOutput('image-url',imageUrl)
     const details=files.map(file=>`- \`${file.path}\` (${file.engine})${file.semantic?'':' - file-level fallback'}`).join('\n')
-    const body=`${marker}\n## Code To UML - Diagram changes\n\n🟢 **${counts.added} added** · 🟡 **${counts.modified} modified** · 🔴 **${counts.removed} removed** across **${files.length} diagram file(s)**.\n\n![Code To UML diagram changes](${imageUrl})\n\n${details}\n\n[Open vector SVG](https://raw.githubusercontent.com/${process.env.GITHUB_REPOSITORY}/${encodeURIComponent(branch)}/${artifactRoot}/diagram-diff.svg) · [Workflow run](https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`
+    const previewBody=renderedPreviews.map(preview=>`<details open>\n<summary><code>${preview.path}</code> · ${preview.title} · ${preview.engine}</summary>\n\n![${preview.title}](${rawUrl(process.env.GITHUB_REPOSITORY,branch,`${artifactRoot}/previews/${preview.filename}`)})\n\n</details>`).join('\n\n')
+    const failedBody=previewFailures.length?`\n\n### Skipped invalid diagrams\n\n${previewFailures.map(preview=>`- \`${preview.path}\` · ${preview.title} (${preview.engine}): ${preview.error}`).join('\n')}`:''
+    const body=`${marker}\n## Code To UML · Diagram changes\n\n🟢 **${counts.added} added** · 🟡 **${counts.modified} modified** · 🔴 **${counts.removed} removed** across **${files.length} changed diagram(s)**.\n\n![Code To UML diagram changes](${imageUrl})\n\n${details}\n\n## Rendered diagrams\n\n${previewBody||'_No current diagram could be rendered (the source may have been deleted or is invalid)._'}${failedBody}\n\n[Open vector diff SVG](${rawUrl(process.env.GITHUB_REPOSITORY,branch,`${artifactRoot}/diagram-diff.svg`)}) · [Download workflow artifact](https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`
     const commentsResponse=await fetch(`${api}/issues/${event.pull_request.number}/comments?per_page=100`,{headers}),comments=commentsResponse.ok?await commentsResponse.json():[]
     const previous=comments.find(comment=>comment.body?.includes(marker))
     const commentResponse=await fetch(previous?`${api}/issues/comments/${previous.id}`:`${api}/issues/${event.pull_request.number}/comments`,{method:previous?'PATCH':'POST',headers,body:JSON.stringify({body})})
     if(!commentResponse.ok)throw new Error(`Unable to publish PR comment: HTTP ${commentResponse.status} ${await commentResponse.text()}`)
-  }
-  if(false&&process.env.CTU_COMMENT==='true'&&process.env.GITHUB_TOKEN&&event.pull_request){
-    const marker='<!-- code-to-uml-pr-diff -->',api=`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}`,headers={Authorization:`Bearer ${process.env.GITHUB_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'}
-    const details=files.map(file=>`- \`${file.path}\` (${file.engine})${file.semantic?'':' — file-level fallback'}`).join('\n')
-    const body=`${marker}\n## Code To UML · Diagram changes\n\n🟢 **${counts.added} added** · 🟡 **${counts.modified} modified** · 🔴 **${counts.removed} removed** across **${files.length} diagram file(s)**.\n\n${details}\n\n[Download the generated SVG from this workflow run](https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}).`
-    const commentsResponse=await fetch(`${api}/issues/${event.pull_request.number}/comments?per_page=100`,{headers}),comments=commentsResponse.ok?await commentsResponse.json():[]
-    const previous=comments.find(comment=>comment.body?.includes(marker))
-    const commentResponse=await fetch(previous?`${api}/issues/comments/${previous.id}`:`${api}/issues/${event.pull_request.number}/comments`,{method:previous?'PATCH':'POST',headers,body:JSON.stringify({body})})
-    if(!commentResponse.ok)console.warn(`Unable to publish PR comment: HTTP ${commentResponse.status}`)
   }
 }
 

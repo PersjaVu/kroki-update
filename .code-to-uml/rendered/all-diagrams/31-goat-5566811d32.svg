@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1"
+    width="336" height="58"
+    viewBox="0 0 336 58">
+  <style type="text/css" source-text-origin="source-independent defaults: shared by ASCII and UTF-8">
+    svg {
+        color-scheme: light dark; /* this becomes necessary if not inherited from parent elements */
+        font-family: monospace;
+        font-size: 15px;
+    }
+    text {
+        stroke: none;
+        text-anchor: middle;
+    }
+    .path {
+        fill: none;
+    }
+    circle.filled {
+        fill: inherit;
+    }
+    circle.hollow {
+         fill: none;
+    }
+    svg {
+        color: #000;  /* set value of 'currentColor' */
+    }
+    @media (prefers-color-scheme: dark) {
+        svg {
+            color: #FFF;  /* set value of 'currentColor' */
+        }
+    }
+    svg {
+        fill: currentColor;
+        stroke: currentColor;
+    }
+  </style>
+
+<g transform='translate(8,12)'>
+  <g id='lines'>
+    <polyline class="path" points="0,0 72,0"/>
+    <polyline class="path" points="120,0 184,0"/>
+    <polyline class="path" points="232,0 320,0"/>
+    <polyline class="path" points="88,16 104,16"/>
+    <polyline class="path" points="200,16 216,16"/>
+    <polyline class="path" points="0,32 72,32"/>
+    <polyline class="path" points="120,32 184,32"/>
+    <polyline class="path" points="232,32 320,32"/>
+    <polyline class="path" points="0,0 0,32"/>
+    <polyline class="path" points="72,0 72,32"/>
+    <polyline class="path" points="120,0 120,32"/>
+    <polyline class="path" points="184,0 184,32"/>
+    <polyline class="path" points="232,0 232,32"/>
+    <polyline class="path" points="320,0 320,32"/>
+  </g>
+  <g id='triangles'>
+    <polygon points="112,16 100,10.4 100,21.6" transform="rotate(0, 104, 16)" class="arrowhead"></polygon>
+    <polygon points="224,16 212,10.4 212,21.6" transform="rotate(0, 216, 16)" class="arrowhead"></polygon>
+  </g>
+  <g id='roundedCorners'>
+  </g>
+  <g id='circles'>
+  </g>
+  <g id='bridges'>
+  </g>
+  <g id='text'>
+    <text x="16" y="20">C</text>
+    <text x="24" y="20">l</text>
+    <text x="32" y="20">i</text>
+    <text x="40" y="20">e</text>
+    <text x="48" y="20">n</text>
+    <text x="56" y="20">t</text>
+    <text x="136" y="20">K</text>
+    <text x="144" y="20">r</text>
+    <text x="152" y="20">o</text>
+    <text x="160" y="20">k</text>
+    <text x="168" y="20">i</text>
+    <text x="248" y="20">R</text>
+    <text x="256" y="20">e</text>
+    <text x="264" y="20">n</text>
+    <text x="272" y="20">d</text>
+    <text x="280" y="20">e</text>
+    <text x="288" y="20">r</text>
+    <text x="296" y="20">e</text>
+    <text x="304" y="20">r</text>
+</g>
+</g>
+</svg>

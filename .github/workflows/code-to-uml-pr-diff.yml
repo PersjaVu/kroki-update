@@ -15,6 +15,13 @@ on:
       - "**/*.d2"
       - "**/*.dbml"
       - "**/*.ditaa"
+      - "**/*.diag"
+      - "**/*.blockdiag"
+      - "**/*.seqdiag"
+      - "**/*.actdiag"
+      - "**/*.nwdiag"
+      - "**/*.packetdiag"
+      - "**/*.rackdiag"
       - "**/*.bpmn"
       - "**/*.excalidraw"
       - "**/*.structurizr"
@@ -25,6 +32,10 @@ on:
       - "**/*.bob"
       - "**/*.wavedrom"
       - "**/*.pikchr"
+      - "**/*.tex"
+      - "**/*.sv"
+      - "**/*.json5"
+      - "**/*.wireviz"
 
 permissions:
   contents: write
@@ -61,6 +72,7 @@ jobs:
         with:
           mode: pr-diff
           server-url: http://localhost:8000
+          api-key: ${{ secrets.CODE_TO_UML_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           diff-output: artifacts/diagram-pr-diff.svg
           comment: "true"

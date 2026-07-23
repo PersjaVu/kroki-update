@@ -10,7 +10,8 @@
   "scripts": {
     "test": "node --test-force-exit ci/tests/smoke.js",
     "update-versions": "node ci/tasks/update-versions.js",
-    "test:pr-diff": "node --test github-action/pr-diagram-diff.test.mjs"
+    "test:pr-diff": "node --test github-action/pr-diagram-diff.test.mjs",
+    "test:github-action": "node --test github-action/*.test.mjs"
   },
   "volta": {
     "node": "24.16.0"

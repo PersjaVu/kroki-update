@@ -1,8 +1,8 @@
 name: Code To UML
-description: Render diagrams or create a semantic diagram change map for a pull request
+description: Render diagrams, pre-render Markdown, or create a semantic diagram change map for a pull request
 inputs:
   mode:
-    description: render or pr-diff
+    description: render, pre-render, or pr-diff
     default: render
   server-url:
     description: Code To UML base URL
@@ -34,6 +34,9 @@ inputs:
   artifact-branch:
     description: Branch used to store PR diff SVG and PNG images
     default: diagram-artifacts
+  markdown-output:
+    description: Repository directory for committed Markdown SVG previews
+    default: .code-to-uml/rendered
 outputs:
   changed:
     description: Whether diagram files changed in PR diff mode
@@ -56,6 +59,12 @@ outputs:
   image-url:
     description: Raw GitHub URL embedded in the pull request comment
     value: ${{ steps.pr-diff.outputs.image-url }}
+  rendered:
+    description: Number of Markdown diagrams rendered in pre-render mode
+    value: ${{ steps.pre-render.outputs.rendered }}
+  failed:
+    description: Number of invalid Markdown diagrams skipped in pre-render mode
+    value: ${{ steps.pre-render.outputs.failed }}
 runs:
   using: composite
   steps:
@@ -82,10 +91,21 @@ runs:
         CTU_ARTIFACT_BRANCH: ${{ inputs.artifact-branch }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: node "${{ github.action_path }}/github-action/pr-diagram-diff.mjs"
+    - name: Pre-render Markdown diagrams
+      id: pre-render
+      if: inputs.mode == 'pre-render'
+      shell: powershell
+      env:
+        CTU_SERVER: ${{ inputs.server-url }}
+        CTU_API_KEY: ${{ inputs.api-key }}
+        CTU_MARKDOWN_OUTPUT: ${{ inputs.markdown-output }}
+      run: node "${{ github.action_path }}/github-action/pre-render-markdown.mjs"
     - name: Upload diagram change map
       if: inputs.mode == 'pr-diff' && steps.pr-diff.outputs.changed == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: code-to-uml-pr-diff
-        path: ${{ inputs.diff-output }}
+        path: |
+          ${{ inputs.diff-output }}
+          artifacts/pr-diagrams
         if-no-files-found: error

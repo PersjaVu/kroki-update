@@ -146,6 +146,11 @@ Là reviewer, tôi muốn bot tự phát hiện diagram thay đổi giữa base 
 9. **Cho trước** có change map, **Khi** job hoàn tất, **Thì** SVG được upload thành workflow artifact và Job Summary có thống kê.
 10. **Cho trước** bot đã render change map, **Khi** publish kết quả, **Thì** SVG và PNG được commit vào nhánh `diagram-artifacts` dưới thư mục riêng của PR.
 11. **Cho trước** URL ảnh trên artifact branch, **Khi** bot cập nhật comment, **Thì** PNG được nhúng trực tiếp bằng Markdown `![](...)` và SVG có link tải riêng.
+12. **Cho trước** README/Markdown chứa code fence Mermaid hoặc PlantUML, **Khi** người dùng push, **Thì** Action tự detect và render từng block thành SVG.
+13. **Cho trước** SVG đã render, **Khi** bot commit kết quả, **Thì** chính file Markdown hiển thị ảnh bằng đường dẫn tương đối `![](...)` trên GitHub.
+14. **Cho trước** source diagram cần tiếp tục chỉnh sửa, **Khi** Markdown được pre-render, **Thì** source vẫn được giữ trong `<details>` thu gọn và được nhận diện ở lần chạy sau.
+15. **Cho trước** Action chạy lại mà source không đổi, **Khi** kết thúc pre-render, **Thì** không phát sinh commit mới.
+16. **Cho trước** một code block sai cú pháp, **Khi** pre-render nhiều block, **Thì** block lỗi giữ nguyên source và không chặn các SVG hợp lệ khác.
 
 ### Cách người dùng sử dụng hệ thống
 

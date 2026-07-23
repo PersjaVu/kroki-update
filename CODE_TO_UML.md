@@ -51,6 +51,16 @@ Register a runner from **Repository Settings → Actions → Runners → New sel
 
 The Action compares the PR base SHA with its head SHA, generates `artifacts/diagram-pr-diff.svg`, uploads it as the `code-to-uml-pr-diff` workflow artifact and maintains one PR summary comment. It also creates the orphan branch `diagram-artifacts`, stores SVG and PNG under `pull-requests/<number>/`, and embeds the PNG directly in the comment with Markdown image syntax. The change map uses green for added nodes, amber for modified nodes and red for removed nodes. Mermaid, PlantUML/C4, Graphviz/DOT, D2 and DBML receive semantic node/edge comparison. Markdown fenced diagrams are compared independently; other renderer files use a clearly labelled file-level fallback.
 
+### Automatic diagrams inside GitHub Markdown
+
+The included `.github/workflows/code-to-uml-markdown.yml` implements the pre-render strategy used when no public GitHub App is available. On every Markdown push it detects supported fenced code blocks, renders each valid block to SVG through the local service, uploads the SVG directory as a workflow artifact, and commits both the generated images under `.code-to-uml/rendered/` and the updated Markdown back to the same branch.
+
+The Markdown displays `![title](relative-svg-path)` first. Its original diagram source remains in a collapsed `<details>` block, so the document shows an image by default while the source remains editable and detectable on the next run. The transformation is idempotent: a second run with unchanged sources creates no commit. Invalid diagrams are reported and left as source without blocking valid blocks.
+
+`actions/upload-artifact` is kept for downloading CI output, but its authenticated ZIP URL cannot be embedded as an image. PR comments therefore use raw SVG/PNG URLs from the `diagram-artifacts` branch. Repository Markdown uses relative URLs to SVG files committed on the source branch, which makes previews work on GitHub and in repository clones.
+
+For more than 20 guest renders per minute, set the optional `CODE_TO_UML_API_KEY` repository secret. Without it, the Action detects HTTP 429 and retries after the local Gateway rate-limit window resets.
+
 ## VS Code extension
 
 ```powershell
