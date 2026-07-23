@@ -526,6 +526,8 @@ Màu change map:
 
 Artifact `diagram-pr-diff.svg` được upload bằng `actions/upload-artifact`. Bot tạo hoặc cập nhật một comment cố định có số node thêm/sửa/xóa và link đến workflow run, tránh spam comment sau mỗi lần push.
 
+Ngoài workflow artifact, Action sử dụng GitHub Git Data API để duy trì nhánh orphan `diagram-artifacts`. Mỗi PR có hai file `pull-requests/<PR_NUMBER>/diagram-diff.svg` và `diagram-diff.png`. Comment nhúng PNG bằng cú pháp `![Code To UML diagram changes](raw-url)` để hiển thị trực tiếp, đồng thời cung cấp link SVG vector. Git Data API tạo blob, tree, commit rồi cập nhật branch ref, không checkout/chuyển branch trong workspace của runner.
+
 Action nhận các input:
 
 | Input | Ý nghĩa |

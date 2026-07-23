@@ -144,6 +144,8 @@ Là reviewer, tôi muốn bot tự phát hiện diagram thay đổi giữa base 
 7. **Cho trước** renderer chưa có semantic parser, **Khi** file thay đổi, **Thì** báo cáo dùng file-level fallback có nhãn rõ ràng.
 8. **Cho trước** workflow chạy lại sau khi push thêm commit, **Khi** bot comment, **Thì** comment cũ được cập nhật thay vì tạo comment mới.
 9. **Cho trước** có change map, **Khi** job hoàn tất, **Thì** SVG được upload thành workflow artifact và Job Summary có thống kê.
+10. **Cho trước** bot đã render change map, **Khi** publish kết quả, **Thì** SVG và PNG được commit vào nhánh `diagram-artifacts` dưới thư mục riêng của PR.
+11. **Cho trước** URL ảnh trên artifact branch, **Khi** bot cập nhật comment, **Thì** PNG được nhúng trực tiếp bằng Markdown `![](...)` và SVG có link tải riêng.
 
 ### Cách người dùng sử dụng hệ thống
 
@@ -230,6 +232,8 @@ Là reviewer, tôi muốn bot tự phát hiện diagram thay đổi giữa base 
 - **FR-037**: File rename PHẢI được so sánh giữa path cũ ở base và path mới ở head.
 - **FR-038**: Workflow localhost PHẢI chạy trên self-hosted runner cùng máy với Docker và KHÔNG yêu cầu public deployment.
 - **FR-039**: Self-hosted PR workflow KHÔNG ĐƯỢC chạy đối với Pull Request đến từ fork không tin cậy.
+- **FR-040**: Action PHẢI duy trì nhánh orphan `diagram-artifacts` và lưu ảnh theo số Pull Request.
+- **FR-041**: PR comment PHẢI nhúng PNG trực tiếp bằng Markdown image syntax và cung cấp link SVG vector.
 
 ### Ranh giới phạm vi
 

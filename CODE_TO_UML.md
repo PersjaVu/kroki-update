@@ -49,7 +49,7 @@ Invoke-WebRequest http://localhost:8000/health -UseBasicParsing
 
 Register a runner from **Repository Settings → Actions → Runners → New self-hosted runner**, follow GitHub's Windows commands, and install it as a Windows service if it must receive PR jobs while no terminal is open. The workflow rejects fork PRs because self-hosted runners must not execute untrusted code.
 
-The Action compares the PR base SHA with its head SHA, generates `artifacts/diagram-pr-diff.svg`, uploads it as the `code-to-uml-pr-diff` workflow artifact and maintains one PR summary comment. The change map uses green for added nodes, amber for modified nodes and red for removed nodes. Mermaid, PlantUML/C4, Graphviz/DOT, D2 and DBML receive semantic node/edge comparison. Markdown fenced diagrams are compared independently; other renderer files use a clearly labelled file-level fallback.
+The Action compares the PR base SHA with its head SHA, generates `artifacts/diagram-pr-diff.svg`, uploads it as the `code-to-uml-pr-diff` workflow artifact and maintains one PR summary comment. It also creates the orphan branch `diagram-artifacts`, stores SVG and PNG under `pull-requests/<number>/`, and embeds the PNG directly in the comment with Markdown image syntax. The change map uses green for added nodes, amber for modified nodes and red for removed nodes. Mermaid, PlantUML/C4, Graphviz/DOT, D2 and DBML receive semantic node/edge comparison. Markdown fenced diagrams are compared independently; other renderer files use a clearly labelled file-level fallback.
 
 ## VS Code extension
 

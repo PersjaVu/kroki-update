@@ -27,7 +27,7 @@ on:
       - "**/*.pikchr"
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
 

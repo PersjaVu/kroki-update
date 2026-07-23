@@ -31,6 +31,9 @@ inputs:
   comment:
     description: Post a pull request summary comment
     default: "true"
+  artifact-branch:
+    description: Branch used to store PR diff SVG and PNG images
+    default: diagram-artifacts
 outputs:
   changed:
     description: Whether diagram files changed in PR diff mode
@@ -50,6 +53,9 @@ outputs:
   output:
     description: Generated artifact path
     value: ${{ steps.pr-diff.outputs.output }}
+  image-url:
+    description: Raw GitHub URL embedded in the pull request comment
+    value: ${{ steps.pr-diff.outputs.image-url }}
 runs:
   using: composite
   steps:
@@ -73,6 +79,7 @@ runs:
         CTU_API_KEY: ${{ inputs.api-key }}
         CTU_DIFF_OUTPUT: ${{ inputs.diff-output }}
         CTU_COMMENT: ${{ inputs.comment }}
+        CTU_ARTIFACT_BRANCH: ${{ inputs.artifact-branch }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: node "${{ github.action_path }}/github-action/pr-diagram-diff.mjs"
     - name: Upload diagram change map
