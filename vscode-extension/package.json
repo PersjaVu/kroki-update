@@ -2,7 +2,7 @@
   "name": "code-to-uml",
   "displayName": "Code To UML",
   "description": "Live preview, render-on-save and export through a local or hosted Code To UML service",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "publisher": "code-to-uml",
   "engines": { "vscode": "^1.95.0" },
   "categories": ["Visualization", "Other"],

@@ -83,9 +83,7 @@
     .resizer::after { content: ""; position: absolute; width: 2px; height: 38px; background: #334462; border-radius: 2px; inset: 50% auto auto 3px; transform: translateY(-50%); }
     .preview-stage {
       min-height: 0; position: relative; display: grid; place-items: center; overflow: hidden;
-      background-color: #f8fafc;
-      background-image: linear-gradient(#dbe3ed 1px, transparent 1px), linear-gradient(90deg, #dbe3ed 1px, transparent 1px);
-      background-size: 24px 24px;
+      background: #fff;
       cursor: grab; touch-action: none; user-select: none;
     }
     .preview-stage.is-panning { cursor: grabbing; }
@@ -156,7 +154,7 @@
     .diagram-gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,300px)); gap:20px; min-height:260px; align-items:start; }
     .diagram-card { padding:0; overflow:hidden; text-align:left; cursor:pointer; color:var(--text); background:#111b2d; border:1px solid #263750; border-radius:14px; transition:transform .18s,border-color .18s,box-shadow .18s; }
     .diagram-card:hover { transform:translateY(-3px); border-color:#49617f; box-shadow:0 16px 38px #0007; }
-    .diagram-thumb { height:210px; display:grid; place-items:center; background:#f8fafc; overflow:hidden; }
+    .diagram-thumb { height:210px; display:grid; place-items:center; background:#fff; overflow:hidden; }
     .diagram-thumb img { max-width:90%; max-height:145px; }
     .diagram-thumb .thumb-state { color:#64748b; font-size:12px; padding:18px; text-align:center; }
     .diagram-meta { padding:15px 17px 17px; background:#111b2d; border-top:1px solid #263750; }
@@ -228,7 +226,7 @@
         <option value="tikz">TikZ</option>
       </select>
       <button id="renderButton" class="button primary" type="button">▶ Render</button>
-      <button id="downloadButton" class="button" type="button" disabled>↓ SVG</button>
+      <button id="downloadButton" class="button" type="button" disabled>↓ Export</button>
       <button id="saveButton" class="button" type="button">Save</button>
       <button id="shareButton" class="button" type="button">Share</button>
       <button id="savedButton" class="button" type="button">My Diagrams</button>
@@ -323,6 +321,17 @@
   </div>
 </dialog>
 
+<dialog id="exportDialog" style="width:min(440px,calc(100% - 40px))">
+  <div class="modal-head"><h2>Export diagram</h2><span style="flex:1"></span><button class="button" id="closeExport" type="button">✕</button></div>
+  <div class="modal-body">
+    <p>Preview always uses a white background. Choose the file background only for this export.</p>
+    <label class="field">Format<select id="exportFormat" class="control"><option value="svg">SVG — vector</option><option value="png">PNG — raster image</option></select></label>
+    <label class="field">Background<select id="exportBackground" class="control"><option value="white">White</option><option value="black">Black</option><option value="transparent">Transparent</option></select></label>
+    <button class="button primary" id="confirmExport" type="button">Download</button>
+    <p id="exportMessage" style="color:var(--red);min-height:18px"></p>
+  </div>
+</dialog>
+
 <script src="/assets/collab-client.js"></script>
 <script>
 (() => {
@@ -381,7 +390,7 @@
     time.textContent = 'Rendering…';
     const started = performance.now();
     try {
-      const response = await fetch(`/${type.value}/svg`, {
+      const response = await fetch(`/${type.value}/svg?background=white`, {
         method: 'POST', headers: { 'Content-Type': 'text/plain', 'Accept': 'image/svg+xml' },
         // Node-based renderers are sensitive to CRLF and require a final newline.
         body: source.value.replace(/\r\n/g, '\n') + '\n\n', signal: request.signal
@@ -432,7 +441,18 @@
   previewStage.addEventListener('pointermove',e=>{if(!viewport.dragging||e.pointerId!==viewport.pointerId)return;viewport.x=viewport.originX+e.clientX-viewport.startX;viewport.y=viewport.originY+e.clientY-viewport.startY;applyViewport()});
   function endPan(e){if(!viewport.dragging||e.pointerId!==viewport.pointerId)return;viewport.dragging=false;viewport.pointerId=null;previewStage.classList.remove('is-panning');if(previewStage.hasPointerCapture(e.pointerId))previewStage.releasePointerCapture(e.pointerId)}
   previewStage.addEventListener('pointerup',endPan);previewStage.addEventListener('pointercancel',endPan);
-  download.addEventListener('click', () => { const a=document.createElement('a'); a.href=objectUrl; a.download=`diagram-${type.value}.svg`; a.click(); });
+  const exportDialog=document.querySelector('#exportDialog');
+  download.addEventListener('click',()=>{document.querySelector('#exportMessage').textContent='';exportDialog.showModal()});
+  document.querySelector('#closeExport').addEventListener('click',()=>exportDialog.close());
+  document.querySelector('#confirmExport').addEventListener('click',async()=>{
+    const format=document.querySelector('#exportFormat').value,background=document.querySelector('#exportBackground').value,message=document.querySelector('#exportMessage');
+    const button=document.querySelector('#confirmExport');button.disabled=true;message.textContent='Preparing export…';
+    try{
+      const response=await fetch(`/${type.value}/${format}?background=${background}`,{method:'POST',headers:{'Content-Type':'text/plain','Accept':format==='svg'?'image/svg+xml':'image/png'},body:source.value.replace(/\r\n/g,'\n')+'\n\n'});
+      if(!response.ok)throw new Error((await response.text())||`Export failed (${response.status})`);
+      const url=URL.createObjectURL(await response.blob()),a=document.createElement('a');a.href=url;a.download=`diagram-${type.value}.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);exportDialog.close();
+    }catch(e){message.textContent=e.message}finally{button.disabled=false}
+  });
   const dialog = document.querySelector('#infoDialog');
   document.querySelector('#infoButton').addEventListener('click', () => dialog.showModal());
   document.querySelector('#closeInfo').addEventListener('click', () => dialog.close());
@@ -479,7 +499,7 @@
       list.appendChild(card);
       try {
         const d=await api(`/api/diagrams/${item.id}`);
-        const response=await fetch(`/${d.engine}/svg`,{method:'POST',headers:{'Content-Type':'text/plain','Accept':'image/svg+xml'},body:d.source.replace(/\r\n/g,'\n')+'\n\n'});
+        const response=await fetch(`/${d.engine}/svg?background=white`,{method:'POST',headers:{'Content-Type':'text/plain','Accept':'image/svg+xml'},body:d.source.replace(/\r\n/g,'\n')+'\n\n'});
         if(!response.ok)throw new Error('Preview unavailable');
         const url=URL.createObjectURL(await response.blob()),img=document.createElement('img');img.src=url;img.alt=`Preview of ${item.name}`;img.onload=()=>URL.revokeObjectURL(url);
         const thumb=card.querySelector('.diagram-thumb');thumb.innerHTML='';thumb.appendChild(img);

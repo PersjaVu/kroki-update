@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import http from 'node:http'
 import { WebSocketServer } from 'ws'
 import * as Y from 'yjs'
+import { applyBackground, normalizeBackground } from './background.js'
 
 const { Pool } = pg
 const app = express()
@@ -158,16 +159,27 @@ app.get('/api/shared/:token',async(req,res,next)=>{try{const q=await pool.query(
 
 function rateLimit(req,res,next){const key=req.identity?.id||req.ip,limit=req.identity?userLimit:guestLimit,minute=Math.floor(Date.now()/60000),id=`${key}:${minute}`,count=(buckets.get(id)||0)+1;buckets.set(id,count);res.set('X-RateLimit-Limit',String(limit));res.set('X-RateLimit-Remaining',String(Math.max(0,limit-count)));if(count>limit)return jsonError(res,429,'Rate limit exceeded');next()}
 const renderPath=/^\/(plantuml|c4plantuml|mermaid|graphviz|dot|d2|structurizr|blockdiag|seqdiag|actdiag|nwdiag|packetdiag|rackdiag|bpmn|dbml|diagramsnet|ditaa|erd|excalidraw|goat|nomnoml|pikchr|svgbob|symbolator|umlet|vega|vegalite|wavedrom|bytefield|wireviz|tikz)\/(svg|png|pdf|jpeg|txt)$/
+function sendRendered(res,status,contentType,body,format,background,headers={}){
+  const content=applyBackground(body,format,background)
+  res.status(status).set({'Content-Type':contentType,...headers}).send(content)
+}
 app.post(renderPath,rateLimit,async(req,res,next)=>{try{
-  const source=typeof req.body==='string'?req.body:JSON.stringify(req.body), options=Object.fromEntries(Object.entries(req.headers).filter(([k])=>k.startsWith('kroki-diagram-options-'))), cacheKey=sha(`${req.path}\0${JSON.stringify(options)}\0${source}`)
-  const hit=await pool.query(`SELECT content_type,body FROM render_cache WHERE cache_key=$1 AND expires_at>now()`,[cacheKey]);if(hit.rows[0]){res.set({'Content-Type':hit.rows[0].content_type,'X-Cache':'HIT','ETag':`"${cacheKey}"`});return res.send(hit.rows[0].body)}
-  const headers={'content-type':req.headers['content-type']||'text/plain','accept':req.headers.accept||'*/*',...options};const upstream=await fetch(core+req.originalUrl,{method:'POST',headers,body:source});const body=Buffer.from(await upstream.arrayBuffer()),ct=upstream.headers.get('content-type')||'application/octet-stream'
+  const format=req.path.split('/').pop(),background=normalizeBackground(req.query.background),source=typeof req.body==='string'?req.body:JSON.stringify(req.body), options=Object.fromEntries(Object.entries(req.headers).filter(([k])=>k.startsWith('kroki-diagram-options-'))), cacheKey=sha(`${req.path}\0${JSON.stringify(options)}\0${source}`)
+  const hit=await pool.query(`SELECT content_type,body FROM render_cache WHERE cache_key=$1 AND expires_at>now()`,[cacheKey]);if(hit.rows[0])return sendRendered(res,200,hit.rows[0].content_type,hit.rows[0].body,format,background,{'X-Cache':'HIT','ETag':`"${cacheKey}"`})
+  const headers={'content-type':req.headers['content-type']||'text/plain','accept':req.headers.accept||'*/*',...options};const upstream=await fetch(core+req.path,{method:'POST',headers,body:source});const body=Buffer.from(await upstream.arrayBuffer()),ct=upstream.headers.get('content-type')||'application/octet-stream'
   if(upstream.ok)await pool.query(`INSERT INTO render_cache(cache_key,content_type,body,expires_at) VALUES($1,$2,$3,now()+interval '24 hours') ON CONFLICT(cache_key) DO UPDATE SET body=EXCLUDED.body,expires_at=EXCLUDED.expires_at`,[cacheKey,ct,body])
-  res.status(upstream.status).set({'Content-Type':ct,'X-Cache':'MISS','ETag':`"${cacheKey}"`}).send(body)
+  if(upstream.ok)return sendRendered(res,upstream.status,ct,body,format,background,{'X-Cache':'MISS','ETag':`"${cacheKey}"`})
+  res.status(upstream.status).set({'Content-Type':ct,'X-Cache':'MISS'}).send(body)
 }catch(e){next(e)}})
 
-app.use(async(req,res,next)=>{try{const upstream=await fetch(core+req.originalUrl,{method:req.method,headers:{accept:req.headers.accept||'*/*'}});res.status(upstream.status);upstream.headers.forEach((v,k)=>res.set(k,v));res.send(Buffer.from(await upstream.arrayBuffer()))}catch(e){next(e)}})
-app.use((err,_req,res,_next)=>{console.error(err);jsonError(res,500,'Internal server error')})
+app.use(async(req,res,next)=>{try{
+  const url=new URL(req.originalUrl,publicUrl),background=normalizeBackground(url.searchParams.get('background'));url.searchParams.delete('background')
+  const upstream=await fetch(core+url.pathname+url.search,{method:req.method,headers:{accept:req.headers.accept||'*/*'}}),body=Buffer.from(await upstream.arrayBuffer())
+  const format=url.pathname.match(/^\/[^/]+\/(svg|png|pdf|jpeg|txt)(?:\/|$)/)?.[1]
+  if(format&&upstream.ok)return sendRendered(res,upstream.status,upstream.headers.get('content-type')||'application/octet-stream',body,format,background)
+  res.status(upstream.status);upstream.headers.forEach((v,k)=>res.set(k,v));res.send(body)
+}catch(e){next(e)}})
+app.use((err,_req,res,_next)=>{console.error(err);jsonError(res,err.status||500,err.status?err.message:'Internal server error')})
 
 await migrate()
 const server=http.createServer(app)

@@ -33,7 +33,7 @@ function markdownPlugin(md) {
     }
     title = title || `${engine.charAt(0).toUpperCase()}${engine.slice(1)} diagram`
     const encoded = zlib.deflateSync(Buffer.from(token.content, 'utf8'), { level:9 }).toString('base64url')
-    const imageUrl = `${serverUrl()}/${engine}/svg/${encoded}`
+    const imageUrl = `${serverUrl()}/${engine}/svg/${encoded}?background=white`
     const safeTitle = md.utils.escapeHtml(title)
     const safeUrl = md.utils.escapeHtml(imageUrl)
     const caption = titleComesFromHeading ? '' : `<figcaption><strong>${safeTitle}</strong><span>${engine}</span></figcaption>`
@@ -73,8 +73,9 @@ async function invalidateKey(context, message = 'Your API key was revoked or exp
   invalidatingKey=false
 }
 
-async function renderSource(context, source, engine, format = 'svg') {
-  const response = await fetch(`${serverUrl()}/${engine}/${format}`, {
+async function renderSource(context, source, engine, format = 'svg', background = 'transparent') {
+  const query = format === 'svg' || format === 'png' ? `?background=${encodeURIComponent(background)}` : ''
+  const response = await fetch(`${serverUrl()}/${engine}/${format}${query}`, {
     method: 'POST',
     headers: { 'Content-Type':'text/plain', Accept:format === 'svg' ? 'image/svg+xml' : format === 'pdf' ? 'application/pdf' : `image/${format}`, ...(await authHeaders(context)) },
     body: source + '\n\n'
@@ -113,7 +114,7 @@ async function updatePreview(context, document, immediate = false) {
     try {
       const analysis = diagramsFor(document)
       const results = await Promise.all(analysis.diagrams.map(async diagram => {
-        try { const result = await renderSource(context, diagram.source, diagram.engine, 'svg');return { ...diagram, svg:result.body.toString('utf8') } }
+        try { const result = await renderSource(context, diagram.source, diagram.engine, 'svg', 'white');return { ...diagram, svg:result.body.toString('utf8') } }
         catch (error) { return { ...diagram, error:error.message } }
       }))
       if (sequence !== renderSequence || !previewPanel) return
@@ -143,7 +144,7 @@ function svgSize(svg) {
   return { width:Number(width?.[1] || 1000), height:Number(height?.[1] || 600) }
 }
 
-function combineSvgDiagrams(rendered) {
+function combineSvgDiagrams(rendered, background = 'white') {
   const padding = 32, titleHeight = 34, gap = 24
   const items = rendered.map(item => ({ ...item, ...svgSize(item.svg) }))
   const width = Math.max(320, ...items.map(item => item.width)) + padding * 2
@@ -155,9 +156,12 @@ function combineSvgDiagrams(rendered) {
     const imageX = (width - item.width) / 2
     y = imageY + item.height + gap
     const data = Buffer.from(item.svg, 'utf8').toString('base64')
-    return `<text x="${padding}" y="${titleY}" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#e5eefc">${escapeHtml(item.title)} <tspan font-size="12" font-weight="400" fill="#7dd3fc">${escapeHtml(item.engine)}</tspan></text><image x="${imageX}" y="${imageY}" width="${item.width}" height="${item.height}" href="data:image/svg+xml;base64,${data}"/>`
+    const titleColor = background === 'black' ? '#f8fafc' : '#111827'
+    const engineColor = background === 'black' ? '#7dd3fc' : '#0369a1'
+    return `<text x="${padding}" y="${titleY}" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="${titleColor}">${escapeHtml(item.title)} <tspan font-size="12" font-weight="400" fill="${engineColor}">${escapeHtml(item.engine)}</tspan></text><image x="${imageX}" y="${imageY}" width="${item.width}" height="${item.height}" href="data:image/svg+xml;base64,${data}"/>`
   }).join('')
-  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#0b1220"/>${content}</svg>`, 'utf8')
+  const backdrop = background === 'transparent' ? '' : `<rect width="100%" height="100%" fill="${background === 'black' ? '#000000' : '#ffffff'}" data-code-to-uml-background="true"/>`
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${backdrop}${content}</svg>`, 'utf8')
 }
 
 async function exportDiagram(context) {
@@ -173,6 +177,13 @@ async function exportDiagram(context) {
   const diagram = selection.diagram
   const format = selection.all ? 'svg' : await vscode.window.showQuickPick(['svg','png','pdf'], { placeHolder:'Export format' })
   if (!format) return
+  const backgroundChoice = format === 'svg' || format === 'png' ? await vscode.window.showQuickPick([
+    { label:'White', description:'Solid white background', value:'white' },
+    { label:'Black', description:'Solid black background', value:'black' },
+    { label:'Transparent', description:'Keep the renderer alpha channel', value:'transparent' }
+  ], { placeHolder:'Choose the exported image background' }) : { value:'transparent' }
+  if (!backgroundChoice) return
+  const background = backgroundChoice.value
   const safeTitle = selection.all ? 'all-diagrams' : diagram.title.replace(/[<>:"/\\|?*]+/g, '-').trim() || 'diagram'
   const baseName = editor.document.fileName.replace(/\.[^.]+$/, '')
   const defaultName = diagrams.length > 1 ? `${baseName}-${safeTitle}.${format}` : `${baseName}.${format}`
@@ -181,19 +192,19 @@ async function exportDiagram(context) {
   try {
     if (selection.all) {
       const attempts = await Promise.all(diagrams.map(async item => {
-        try { return { ok:true, item:{ ...item, svg:(await renderSource(context, item.source, item.engine, 'svg')).body.toString('utf8') } } }
+        try { return { ok:true, item:{ ...item, svg:(await renderSource(context, item.source, item.engine, 'svg', 'transparent')).body.toString('utf8') } } }
         catch (error) { return { ok:false, item, error:error.message } }
       }))
       const rendered = attempts.filter(attempt => attempt.ok).map(attempt => attempt.item)
       const skipped = attempts.filter(attempt => !attempt.ok)
       if (!rendered.length) throw new Error('None of the diagrams could be rendered.')
-      await vscode.workspace.fs.writeFile(target, combineSvgDiagrams(rendered))
+      await vscode.workspace.fs.writeFile(target, combineSvgDiagrams(rendered, background))
       if (skipped.length) {
         const names = skipped.map(attempt => `${attempt.item.title} (${attempt.item.engine})`).join(', ')
         vscode.window.showWarningMessage(`Exported ${rendered.length}/${diagrams.length} diagrams. Skipped invalid diagrams: ${names}.`)
       } else vscode.window.showInformationMessage(`Exported all ${rendered.length} diagrams as one SVG to ${target.fsPath}.`)
     } else {
-      const result = await renderSource(context, diagram.source, diagram.engine, format)
+      const result = await renderSource(context, diagram.source, diagram.engine, format, background)
       await vscode.workspace.fs.writeFile(target, result.body)
       vscode.window.showInformationMessage(`Exported ${result.engine} diagram to ${target.fsPath}.`)
     }

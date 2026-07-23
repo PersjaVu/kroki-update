@@ -75,7 +75,7 @@ async function renderSvg(server,apiKey,engine,source){
   if(apiKey)headers.Authorization=`Bearer ${apiKey}`
   let response
   for(let attempt=0;attempt<3;attempt++){
-    response=await fetch(`${server.replace(/\/$/,'')}/${engine}/svg`,{method:'POST',headers,body:source})
+    response=await fetch(`${server.replace(/\/$/,'')}/${engine}/svg?background=white`,{method:'POST',headers,body:source})
     if(response.status!==429)break
     if(attempt===2)break
     const waitMs=60_500-(Date.now()%60_000)
