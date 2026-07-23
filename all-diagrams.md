@@ -8,7 +8,7 @@ the fence language as `diagram_type`.
 ## PlantUML
 
 <!-- code-to-uml:generated:start -->
-![PlantUML](.code-to-uml/rendered/all-diagrams/01-plantuml-fea64c36ab.svg)
+
 
 <details>
 <summary>View plantuml source</summary>
@@ -28,7 +28,7 @@ Alice --> Bob : Hi
 ## C4 PlantUML
 
 <!-- code-to-uml:generated:start -->
-![C4 PlantUML](.code-to-uml/rendered/all-diagrams/02-c4-plantuml-fd99cfac9b.svg)
+
 
 <details>
 <summary>View c4plantuml source</summary>
@@ -50,7 +50,6 @@ Rel(user, system, "Sends diagram source")
 ## Ditaa
 
 <!-- code-to-uml:generated:start -->
-![Ditaa](.code-to-uml/rendered/all-diagrams/03-ditaa-99d7608abc.svg)
 
 <details>
 <summary>View ditaa source</summary>
