@@ -23,6 +23,26 @@ API keys and session/access tokens are stored as SHA-256 hashes. Passwords are s
 
 ## GitHub Action
 
+### One-command setup wizard
+
+The public GitHub CLI extension packages installation as an interactive wizard:
+
+```powershell
+gh auth login
+gh extension install PersjaVu/gh-code-to-uml
+gh code-to-uml init
+```
+
+Run the command inside the target repository. The wizard detects `OWNER/REPO`, asks for Local Docker or Hosted mode, lets the user enable Markdown pre-render and/or PR semantic diff, writes the workflow files, optionally stores `CODE_TO_UML_API_KEY` with GitHub Secrets, and can commit/push after explicit confirmation.
+
+Validate an installation with:
+
+```powershell
+gh code-to-uml doctor --server-url http://localhost:8000
+```
+
+`doctor` checks Git, GitHub authentication, Docker Engine, the Code To UML health endpoint, installed workflows and an online self-hosted runner. Release `v0.1.0` provides precompiled Windows, Linux and macOS binaries, so end users do not need Go or Node.js to run the wizard. Source and releases are available at [PersjaVu/gh-code-to-uml](https://github.com/PersjaVu/gh-code-to-uml).
+
 Create an API key in Account, save it as the repository secret `CODE_TO_UML_API_KEY`, then use:
 
 ```yaml

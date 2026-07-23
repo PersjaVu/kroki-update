@@ -151,6 +151,10 @@ Là reviewer, tôi muốn bot tự phát hiện diagram thay đổi giữa base 
 14. **Cho trước** source diagram cần tiếp tục chỉnh sửa, **Khi** Markdown được pre-render, **Thì** source vẫn được giữ trong `<details>` thu gọn và được nhận diện ở lần chạy sau.
 15. **Cho trước** Action chạy lại mà source không đổi, **Khi** kết thúc pre-render, **Thì** không phát sinh commit mới.
 16. **Cho trước** một code block sai cú pháp, **Khi** pre-render nhiều block, **Thì** block lỗi giữ nguyên source và không chặn các SVG hợp lệ khác.
+17. **Cho trước** repository chưa cài Code To UML workflow, **Khi** người dùng chạy `gh code-to-uml init`, **Thì** wizard detect repository và sinh workflow theo Local/Hosted cùng feature đã chọn.
+18. **Cho trước** người dùng chọn cấu hình API key, **Khi** wizard lưu secret, **Thì** key đi qua `gh secret set` và không xuất hiện trong workflow hoặc source control.
+19. **Cho trước** cấu hình local, **Khi** chạy `gh code-to-uml doctor`, **Thì** công cụ kiểm tra Docker, health endpoint, workflow và self-hosted runner với trạng thái cụ thể.
+20. **Cho trước** máy người dùng không có Go/Node.js, **Khi** cài extension từ release, **Thì** GitHub CLI chọn đúng binary theo OS/architecture và wizard vẫn chạy.
 
 ### Cách người dùng sử dụng hệ thống
 

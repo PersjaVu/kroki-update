@@ -503,6 +503,19 @@ Khi tạo/cập nhật diagram, source và options được ghi thêm vào `diag
 
 ## 14. GitHub Action
 
+### GitHub CLI setup wizard
+
+Repository độc lập `PersjaVu/gh-code-to-uml` đóng gói phần cài đặt thành GitHub CLI extension. Người dùng cài và chạy:
+
+```powershell
+gh extension install PersjaVu/gh-code-to-uml
+gh code-to-uml init
+```
+
+Wizard được viết bằng Go và phát hành dưới dạng binary không phụ thuộc runtime cho Windows/Linux/macOS. Lệnh `init` detect repository qua GitHub CLI, cho chọn `local` hoặc `hosted`, chọn Markdown pre-render/PR diff, sinh workflow, cấu hình `CODE_TO_UML_API_KEY` qua standard input của `gh secret set`, sau đó chỉ commit/push khi người dùng xác nhận. Lệnh `doctor` kiểm tra GitHub auth, Docker, `/health`, workflow đã cài và runner self-hosted đang online.
+
+Release workflow build sáu asset `windows|linux|darwin × amd64|arm64` và `checksums.txt`. Asset tuân theo quy ước tên của precompiled GitHub CLI extension, ví dụ `gh-code-to-uml-windows-amd64.exe`.
+
 Action có ba chế độ:
 
 - `render`: render một source thành output như trước.
